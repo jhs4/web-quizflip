@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Word Swap Quiz</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Welcome Screen -->
+        <div id="welcome-screen">
+            <h1>Word Swap Quiz</h1>
+            <p>Find all possible letter swaps that create valid words!</p>
+            <button id="start-game">Start Quiz</button>
+        </div>
+
+        <!-- Game Screen (initially hidden) -->
+        <div id="game-screen" class="hidden">
+            <div class="top-bar">
+                <button id="start-over">Start over</button>
+                <div id="points">
+                    <span class="point active"></span>
+                    <span class="point active"></span>
+                    <span class="point active"></span>
+                </div>
+                <button id="next" disabled>Next</button>
+            </div>
+
+            <div class="game-area">
+                <div id="progress">4/5</div>
+                <div id="current-word"></div>
+                <div id="timer">30.0</div>
+            </div>
+
+            <div class="solutions-area">
+                <div class="solution-box"></div>
+                <div class="solution-box"></div>
+                <!-- Add more solution boxes as needed -->
+            </div>
+        </div>
+        <div id="end-screen" class="hidden">
+            <h2>Game Over</h2>
+            <button id="restart-game">Play Again</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
