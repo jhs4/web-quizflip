@@ -15,7 +15,8 @@ class WordSwapQuiz {
         this.selectedLetters = [];
         this.foundSolutions = new Set();
         this.timer = null;
-        this.timeLeft = 30.0;
+        this.timeLeft_initial = 30.0;
+        this.timeLeft = this.timeLeft_initial;
         this.wordData = [];
         this.wordFile = 'wordsforswapping.txt';
 
@@ -203,17 +204,24 @@ class WordSwapQuiz {
     }
 
     handleLetterClick(index) {
+        // Get all letter elements from the DOM
         const letterElements = document.querySelectorAll('.letter');
         
+        // Case 1: Clicking an already selected letter
         if (this.selectedLetters.includes(index)) {
-            // Deselect letter
+            // Remove this index from selected letters
             this.selectedLetters = this.selectedLetters.filter(i => i !== index);
+            // Remove visual selection
             letterElements[index].classList.remove('selected');
-        } else if (this.selectedLetters.length < 2) {
-            // Select letter
+        } 
+        // Case 2: Clicking a new letter (when less than 2 are selected)
+        else if (this.selectedLetters.length < 2) {
+            // Add this index to selected letters
             this.selectedLetters.push(index);
+            // Add visual selection
             letterElements[index].classList.add('selected');
 
+            // If we now have 2 letters selected, check if they make a valid solution
             if (this.selectedLetters.length === 2) {
                 this.checkSolution();
             }
@@ -280,7 +288,7 @@ class WordSwapQuiz {
             return;
         }
 
-        this.timeLeft = 30.0;
+        this.timeLeft = this.timeLeft_initial;
         this.stopTimer();
         
         this.timer = setInterval(() => {
