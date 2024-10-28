@@ -1,26 +1,92 @@
+import SeededRandom from './seededRandom.js';
+
 class WordSwapQuiz {
     constructor() {
+        // Get and validate seed
+        const urlParams = new URLSearchParams(window.location.search);
+        const rawSeed = urlParams.get('seed');
+        
+        // Validate seed: must be integer between 0 and 65536
+        this.seed = this.validateSeed(rawSeed);
+        this.rng = new SeededRandom(this.seed);
+        
         this.points = 3;
         this.currentWordIndex = 0;
         this.selectedLetters = [];
         this.foundSolutions = new Set();
         this.timer = null;
         this.timeLeft = 30.0;
-        this.wordData = [];  // Will be populated from file
+        this.wordData = [];
+        this.wordFile = 'wordsforswapping.txt';
 
         this.initializeElements();
         this.attachEventListeners();
         this.endScreen = document.getElementById('end-screen');
         
+        // Display seed in UI
+        this.displaySeed();
+        
         // Load words from file before starting
         this.loadWordsFromFile();
         
         document.getElementById('restart-game').addEventListener('click', () => this.showWelcomeScreen());
+
+        // Get toggle elements
+        this.timerToggle = document.getElementById('timer-toggle');
+        this.livesToggle = document.getElementById('lives-toggle');
+        
+        // Initialize settings based on toggle states
+        this.hasTimeLimit = this.timerToggle.checked;
+        this.hasLives = this.livesToggle.checked;
+        
+        // Initialize points display visibility
+        const pointsDisplay = document.getElementById('points');
+        if (pointsDisplay) {
+            pointsDisplay.style.visibility = this.hasLives ? 'visible' : 'hidden';
+        }
+        
+        // Add toggle listeners
+        this.timerToggle.addEventListener('change', (e) => {
+            this.hasTimeLimit = e.target.checked;
+        });
+        
+        this.livesToggle.addEventListener('change', (e) => {
+            this.hasLives = e.target.checked;
+            const pointsDisplay = document.getElementById('points');
+            if (pointsDisplay) {
+                pointsDisplay.style.visibility = e.target.checked ? 'visible' : 'hidden';
+            }
+        });
+    }
+
+    validateSeed(rawSeed) {
+        // Check if we have a seed and it contains only digits
+        if (rawSeed !== null && /^\d+$/.test(rawSeed)) {
+            // Convert to number and validate range
+            const numSeed = parseInt(rawSeed, 10);
+            if (numSeed >= 0 && numSeed <= 65536) {
+                return numSeed;
+            } else {
+                console.warn(`Invalid seed: ${rawSeed} (must be between 0 and 65536). Using random seed instead.`);
+            }
+        } else if (rawSeed !== null) {
+            console.warn(`Invalid seed: ${rawSeed} (must contain only digits). Using random seed instead.`);
+        }
+        return Math.floor(Math.random() * 65536);
+    }
+
+    displaySeed() {
+        // Add this element to your HTML
+        const seedDisplay = document.getElementById('seed-display');
+        if (seedDisplay) {
+            seedDisplay.textContent = `Seed: ${this.seed}`;
+            seedDisplay.title = 'Share this seed to play the same sequence';
+        }
     }
 
     async loadWordsFromFile() {
         try {
-            const response = await fetch('wordsforswapping.txt');
+            const response = await fetch(this.wordFile);
             if (!response.ok) {
                 throw new Error('Failed to load words file');
             }
@@ -28,17 +94,17 @@ class WordSwapQuiz {
             const text = await response.text();
             const lines = text.trim().split('\n');
             
-            this.wordData = lines.map(line => {
+            // Create wordData array and shuffle it with seeded random
+            this.wordData = this.rng.shuffle(lines.map(line => {
                 const [word, solutions] = line.split(';');
                 return {
                     word: word.trim(),
                     solutions: solutions.split(',').map(s => s.trim())
                 };
-            });
+            }));
 
         } catch (error) {
             console.error('Error loading words:', error);
-            // Fallback to sample data if file loading fails
             this.wordData = [
                 {
                     word: "LATENT",
@@ -83,7 +149,7 @@ class WordSwapQuiz {
     }
 
     resetGame() {
-        this.points = 3;
+        this.points = this.hasLives ? 3 : Infinity;
         this.currentWordIndex = 0;
         this.selectedLetters = [];
         this.foundSolutions = new Set();
@@ -98,23 +164,34 @@ class WordSwapQuiz {
     }
 
     displayWord() {
+        // Get the current word
         const currentWord = this.wordData[this.currentWordIndex].word;
+
+        console.log(this.wordData[this.currentWordIndex].solutions);
+        
+        // Clear the current word display area
         this.currentWordElement.innerHTML = '';
         
         // Create letter elements
         [...currentWord].forEach((letter, index) => {
+            // Create a new span for each letter
             const letterSpan = document.createElement('span');
+            // Add the 'letter' class for styling
             letterSpan.classList.add('letter');
+            // Put the letter in the span
             letterSpan.textContent = letter;
+            // Add click handler for this letter
             letterSpan.addEventListener('click', () => this.handleLetterClick(index));
+            // Add the letter span to the word display
             this.currentWordElement.appendChild(letterSpan);
         });
 
-        // Create solution boxes based on number of solutions
+        // Create solution boxes based on the number of solutions
         const solutionsArea = document.querySelector('.solutions-area');
         solutionsArea.innerHTML = '';  // Clear existing boxes
         const numSolutions = this.wordData[this.currentWordIndex].solutions.length;
         
+        // Create empty solution boxes
         for (let i = 0; i < numSolutions; i++) {
             const solutionBox = document.createElement('div');
             solutionBox.classList.add('solution-box');
@@ -144,35 +221,51 @@ class WordSwapQuiz {
     }
 
     checkSolution() {
+        // Get the current word
         const currentWord = this.wordData[this.currentWordIndex].word;
+        
+        // Convert word to array of letters
         const letters = [...currentWord];
+        
+        // Get the two indices of letters user clicked
         const [i, j] = this.selectedLetters;
         
-        // Swap letters
+        // Swap the letters at those indices
         [letters[i], letters[j]] = [letters[j], letters[i]];
+        
+        // Join letters back into a word
         const swappedWord = letters.join('');
         
+        // Get references to letter elements in UI
         const letterElements = document.querySelectorAll('.letter');
+        
+        // Check if swapped word is a valid solution
         const isCorrect = this.wordData[this.currentWordIndex].solutions.includes(swappedWord);
         
-        // Remove 'selected' and add correct/incorrect to both letters
+        // Remove 'selected' class from both letters
         letterElements[i].classList.remove('selected');
         letterElements[j].classList.remove('selected');
+
+        // Add either 'correct' or 'incorrect' class to both letters, so now the CSS will style them differently
         letterElements[i].classList.add(isCorrect ? 'correct' : 'incorrect');
         letterElements[j].classList.add(isCorrect ? 'correct' : 'incorrect');
 
         if (isCorrect) {
+            // Add to found solutions and update display
             this.foundSolutions.add(swappedWord);
             this.updateSolutionsDisplay();
             
+            // If all solutions found, enable next button and stop timer
             if (this.foundSolutions.size === this.wordData[this.currentWordIndex].solutions.length) {
                 this.nextButton.disabled = false;
                 this.stopTimer();
             }
         } else {
+            // Wrong swap, lose a point
             this.losePoint();
         }
 
+        // Reset after 1 second
         setTimeout(() => {
             this.selectedLetters = [];
             letterElements.forEach(el => {
@@ -182,6 +275,11 @@ class WordSwapQuiz {
     }
 
     startTimer() {
+        if (!this.hasTimeLimit) {
+            this.timerElement.textContent = '∞';
+            return;
+        }
+
         this.timeLeft = 30.0;
         this.stopTimer();
         
@@ -191,8 +289,10 @@ class WordSwapQuiz {
             
             if (this.timeLeft <= 0) {
                 this.stopTimer();
-                this.losePoint();
-                this.showEndScreen();  // Show end screen when timer runs out
+                if (this.hasLives) {
+                    this.losePoint();
+                }
+                this.showEndScreen();
             }
         }, 100);
     }
@@ -205,11 +305,12 @@ class WordSwapQuiz {
     }
 
     losePoint() {
+        if (!this.hasLives) return;
+        
         if (this.points > 0) {
             this.points--;
             this.updatePoints();
             
-            // Check if all points are lost
             if (this.points === 0) {
                 this.showEndScreen();
             }
@@ -229,9 +330,15 @@ class WordSwapQuiz {
     }
 
     updateSolutionsDisplay() {
+        // Get all solution box elements from the DOM
         const solutionBoxes = document.querySelectorAll('.solution-box');
+        
+        // Convert foundSolutions Set to array with [...] spread operator
+        // and iterate through each solution with its index
         [...this.foundSolutions].forEach((solution, index) => {
+            // Check if there's a box for this solution
             if (solutionBoxes[index]) {
+                // Set the text content of the box to the solution
                 solutionBoxes[index].textContent = solution;
             }
         });
@@ -262,6 +369,29 @@ class WordSwapQuiz {
         this.welcomeScreen.classList.add('hidden');
         this.endScreen.classList.remove('hidden');
         this.stopTimer();
+
+        // Update summary information
+        const wordsCompleted = document.getElementById('words-completed');
+        const lastWord = document.getElementById('last-word');
+        const lastWordSolutions = document.getElementById('last-word-solutions');
+        
+        // Show number of completed words
+        wordsCompleted.textContent = this.currentWordIndex;
+        
+        // Show last word and its solutions
+        if (this.wordData.length > 0) {
+            const currentWordData = this.wordData[this.currentWordIndex];
+            lastWord.textContent = currentWordData.word;
+            
+            // Clear and populate solutions
+            lastWordSolutions.innerHTML = '';
+            currentWordData.solutions.forEach(solution => {
+                const solutionSpan = document.createElement('span');
+                solutionSpan.className = 'solution';
+                solutionSpan.textContent = solution;
+                lastWordSolutions.appendChild(solutionSpan);
+            });
+        }
     }
 }
 

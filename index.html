@@ -11,7 +11,19 @@
         <div id="welcome-screen">
             <h1>Word Swap Quiz</h1>
             <p>Find all possible letter swaps that create valid words!</p>
+            <div class="toggle-container">
+                <label class="toggle">
+                    <input type="checkbox" id="timer-toggle" checked>
+                    <span class="toggle-label">Time Limit</span>
+                </label>
+                <label class="toggle">
+                    <input type="checkbox" id="lives-toggle" checked>
+                    <span class="toggle-label">Lives</span>
+                </label>
+            </div>
             <button id="start-game">Start Quiz</button>
+            <p></p>
+            <div id="seed-display"></div>
         </div>
 
         <!-- Game Screen (initially hidden) -->
@@ -35,14 +47,22 @@
             <div class="solutions-area">
                 <div class="solution-box"></div>
                 <div class="solution-box"></div>
-                <!-- Add more solution boxes as needed -->
             </div>
         </div>
+
         <div id="end-screen" class="hidden">
             <h2>Game Over</h2>
+            <div id="game-summary">
+                <p>Words completed: <span id="words-completed">0</span></p>
+                <div id="last-word-summary">
+                    <p>Last word: <span id="last-word">-</span></p>
+                    <p>Possible solutions:</p>
+                    <div id="last-word-solutions"></div>
+                </div>
+            </div>
             <button id="restart-game">Play Again</button>
         </div>
     </div>
-    <script src="script.js"></script>
+    <script type="module" src="script.js"></script>
 </body>
 </html>
