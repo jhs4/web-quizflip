@@ -10,10 +10,11 @@ class WordSwapQuiz {
         // Validate seed and set isManualSeed flag
         const [validatedSeed, isValid] = this.validateSeed(rawSeed);
         this.seed = validatedSeed;
-        this.isManualSeed = isValid;  // Only true if seed was valid
+        this.isManualSeed = isValid;
         
         this.rng = new SeededRandom(this.seed);
         
+        // Initialize game state
         this.maxLives = GAME_CONFIG.gameplay.maxLives;
         this.points = this.maxLives;
         this.currentWordIndex = 0;
@@ -22,60 +23,59 @@ class WordSwapQuiz {
         this.timeLeft_initial = GAME_CONFIG.gameplay.timeLimit;
         this.timeLeft = this.timeLeft_initial;
         this.timer = null;
-        this.timerBarContainer = document.querySelector('.timer-bar-container');
         this.wordData = [];
         this.wordFile = GAME_CONFIG.gameplay.wordsFile;
 
+        // Initialize DOM elements and event listeners
         this.initializeElements();
         this.attachEventListeners();
-        this.endScreen = document.getElementById('end-screen');
         
-        // Display seed in UI
+        // Initialize game
         this.displaySeed();
-        
-        // Load words from file before starting
         this.loadWordsFromFile();
-        
-        document.getElementById('restart-game').addEventListener('click', () => this.showWelcomeScreen());
+    }
 
-        // Get toggle elements
-        this.timerToggle = document.getElementById('timer-toggle');
+    initializeElements() {
+        this.welcomeScreen = document.getElementById('welcome-screen');
+        this.gameScreen = document.getElementById('game-screen');
+        this.currentWordElement = document.getElementById('current-word');
+        this.progressElement = document.getElementById('progress');
+        this.nextButton = document.getElementById('next');
+        this.endScreen = document.getElementById('end-screen');
+        this.livesSelect = document.getElementById('lives-count');
         this.livesToggle = document.getElementById('lives-toggle');
+        this.timerToggle = document.getElementById('timer-toggle');
+        this.timerBarContainer = document.querySelector('.timer-bar-container');
+        this.pointsDisplay = document.getElementById('points');
         
         // Initialize settings based on toggle states
         this.hasTimeLimit = this.timerToggle.checked;
         this.hasLives = this.livesToggle.checked;
         
         // Initialize points display visibility
-        const pointsDisplay = document.getElementById('points');
-        if (pointsDisplay) {
-            pointsDisplay.style.visibility = this.hasLives ? 'visible' : 'hidden';
+        if (this.pointsDisplay) {
+            this.pointsDisplay.style.visibility = this.hasLives ? 'visible' : 'hidden';
         }
+    }
+
+    attachEventListeners() {
+        // Game navigation buttons
+        document.getElementById('start-game').addEventListener('click', () => this.startGame());
+        document.getElementById('start-over').addEventListener('click', () => this.showWelcomeScreen());
+        document.getElementById('restart-game').addEventListener('click', () => this.showWelcomeScreen());
+        this.nextButton.addEventListener('click', () => this.nextWord());
         
-        // Add toggle listeners
+        // Timer toggle
         this.timerToggle.addEventListener('change', (e) => {
             this.hasTimeLimit = e.target.checked;
         });
         
-        this.livesToggle.addEventListener('change', (e) => {
-            this.hasLives = e.target.checked;
-            const pointsDisplay = document.getElementById('points');
-            if (pointsDisplay) {
-                pointsDisplay.style.visibility = e.target.checked ? 'visible' : 'hidden';
-            }
-        });
-
-        // Get lives selector elements
-        this.livesSelect = document.getElementById('lives-count');
-        this.livesToggle = document.getElementById('lives-toggle');
-        
-        // Add toggle listener to enable/disable lives selector
+        // Lives toggle and selector
         this.livesToggle.addEventListener('change', (e) => {
             this.hasLives = e.target.checked;
             this.livesSelect.disabled = !e.target.checked;
-            const pointsDisplay = document.getElementById('points');
-            if (pointsDisplay) {
-                pointsDisplay.style.visibility = e.target.checked ? 'visible' : 'hidden';
+            if (this.pointsDisplay) {
+                this.pointsDisplay.style.visibility = e.target.checked ? 'visible' : 'hidden';
             }
         });
     }
@@ -129,18 +129,54 @@ class WordSwapQuiz {
         }
     }
 
-    initializeElements() {
-        this.welcomeScreen = document.getElementById('welcome-screen');
-        this.gameScreen = document.getElementById('game-screen');
-        this.currentWordElement = document.getElementById('current-word');
-        this.progressElement = document.getElementById('progress');
-        this.nextButton = document.getElementById('next');
+    // Game State Management
+    resetGame() {
+        // Update maxLives based on selector
+        this.maxLives = this.hasLives ? parseInt(this.livesSelect.value) : GAME_CONFIG.gameplay.maxLives;
+        this.points = this.hasLives ? this.maxLives : Infinity;
+        this.currentWordIndex = 0;
+        this.selectedLetters = [];
+        this.foundSolutions = new Set();
+        this.stopTimer();
+        this.updatePoints();
+        
+        // Clear all solution boxes
+        const solutionBoxes = document.querySelectorAll('.solution-box');
+        solutionBoxes.forEach(box => {
+            box.textContent = '';
+        });
     }
 
-    attachEventListeners() {
-        document.getElementById('start-game').addEventListener('click', () => this.startGame());
-        document.getElementById('start-over').addEventListener('click', () => this.showWelcomeScreen());
-        this.nextButton.addEventListener('click', () => this.nextWord());
+    async startGame() {
+        // Ensure words are loaded before starting
+        if (this.wordData.length === 0) {
+            await this.loadWordsFromFile();
+        }
+        
+        this.welcomeScreen.classList.add('hidden');
+        this.gameScreen.classList.remove('hidden');
+        this.resetGame();
+        this.displayWord();
+        this.updateTimerVisibility();
+    }
+
+    nextWord() {
+        this.currentWordIndex++;
+        this.foundSolutions.clear();
+        this.nextButton.disabled = true;
+        
+        // Clear all solution boxes
+        const solutionBoxes = document.querySelectorAll('.solution-box');
+        solutionBoxes.forEach(box => {
+            box.textContent = '';
+        });
+        
+        if (this.currentWordIndex < this.wordData.length) {
+            this.displayWord();
+        } else {
+            // Game complete - show end screen instead of welcome screen
+            this.showEndScreen();
+        }
     }
 
     showWelcomeScreen() {
@@ -161,36 +197,122 @@ class WordSwapQuiz {
         this.resetGame();
     }
 
-    async startGame() {
-        // Ensure words are loaded before starting
-        if (this.wordData.length === 0) {
-            await this.loadWordsFromFile();
-        }
-        
+    showEndScreen() {
+        this.gameScreen.classList.add('hidden');
         this.welcomeScreen.classList.add('hidden');
-        this.gameScreen.classList.remove('hidden');
-        this.resetGame();
-        this.displayWord();
-        this.updateTimerVisibility();
-    }
-
-    resetGame() {
-        // Update maxLives based on selector
-        this.maxLives = this.hasLives ? parseInt(this.livesSelect.value) : GAME_CONFIG.gameplay.maxLives;
-        this.points = this.hasLives ? this.maxLives : Infinity;
-        this.currentWordIndex = 0;
-        this.selectedLetters = [];
-        this.foundSolutions = new Set();
+        this.endScreen.classList.remove('hidden');
         this.stopTimer();
-        this.updatePoints();
+
+        // Update summary information
+        const wordsCompleted = document.getElementById('words-completed');
+        const lastWordSummary = document.getElementById('last-word-summary');
+        const lastWord = document.getElementById('last-word');
+        const lastWordSolutions = document.getElementById('last-word-solutions');
+        const gameOverTitle = document.getElementById('game-over-title');
         
-        // Clear all solution boxes
-        const solutionBoxes = document.querySelectorAll('.solution-box');
-        solutionBoxes.forEach(box => {
-            box.textContent = '';
-        });
+        // We've completed the quiz if currentWordIndex equals wordData.length
+        const isCompleted = this.currentWordIndex === this.wordData.length;
+        
+        gameOverTitle.textContent = isCompleted ? 'Quiz Completed!' : 'Game Over';
+        wordsCompleted.textContent = this.currentWordIndex;
+        
+        // Always show last word summary if we have words
+        if (this.wordData.length > 0) {
+            lastWordSummary.classList.remove('hidden');
+            
+            // If completed, show last word (currentWordIndex - 1)
+            // If failed, show current word (currentWordIndex)
+            const lastWordIndex = isCompleted ? this.currentWordIndex - 1 : this.currentWordIndex;
+            const lastWordData = this.wordData[lastWordIndex];
+            lastWord.textContent = lastWordData.word;
+            
+            // Clear and populate solutions
+            lastWordSolutions.innerHTML = '';
+            lastWordData.solutions.forEach(solution => {
+                const solutionSpan = document.createElement('span');
+                solutionSpan.className = 'solution';
+                solutionSpan.textContent = solution;
+                lastWordSolutions.appendChild(solutionSpan);
+            });
+        } else {
+            lastWordSummary.classList.add('hidden');
+        }
     }
 
+    // Timer Management
+    startTimer() {
+        if (!this.hasTimeLimit) {
+            return;
+        }
+
+        this.timeLeft = this.timeLeft_initial;
+        this.stopTimer();
+        
+        const timerBar = document.getElementById('timer-bar');
+        timerBar.style.width = '100%';
+        
+        this.timer = setInterval(() => {
+            this.timeLeft = Math.max(0, this.timeLeft - 0.1);
+            
+            const percentageElapsed = ((this.timeLeft_initial - this.timeLeft) / this.timeLeft_initial) * 100;
+            timerBar.style.width = `${100 - percentageElapsed}%`;
+            
+            if (this.timeLeft <= 0) {
+                this.stopTimer();
+                if (this.hasLives) {
+                    this.losePoint();
+                }
+                this.showEndScreen();
+            }
+        }, 100);
+    }
+
+    stopTimer() {
+        if (this.timer) {
+            clearInterval(this.timer);
+            this.timer = null;
+        }
+    }
+
+    updateTimerVisibility() {
+        // Show/hide timer bar based on timer toggle
+        if (this.timerBarContainer) {
+            this.timerBarContainer.style.display = this.hasTimeLimit ? 'block' : 'none';
+        }
+    }
+
+    // Points/Lives Management
+    losePoint() {
+        if (!this.hasLives) return;
+        
+        if (this.points > 0) {
+            this.points--;
+            this.updatePoints();
+            
+            if (this.points === 0) {
+                this.showEndScreen();
+            }
+        }
+    }
+
+    updatePoints() {
+        const pointsContainer = document.getElementById('points');
+        pointsContainer.innerHTML = ''; // Clear existing points
+        
+        // Only create points if we're using lives
+        if (this.hasLives) {
+            for (let i = 0; i < this.maxLives; i++) {
+                const point = document.createElement('span');
+                point.classList.add('point');
+                if (i < this.points) {
+                    point.classList.add('active');
+                }
+                pointsContainer.appendChild(point);
+            }
+        }
+    }
+
+    // Display/UI Updates
     displayWord() {
         // Get the current word
         const currentWord = this.wordData[this.currentWordIndex].word;
@@ -284,7 +406,7 @@ class WordSwapQuiz {
         letterElements[i].classList.remove('selected');
         letterElements[j].classList.remove('selected');
 
-        // Add either 'correct' or 'incorrect' class to both letters, so now the CSS will style them differently
+        // Add either 'correct' or 'incorrect' class to both letters
         letterElements[i].classList.add(isCorrect ? 'correct' : 'incorrect');
         letterElements[j].classList.add(isCorrect ? 'correct' : 'incorrect');
 
@@ -318,70 +440,6 @@ class WordSwapQuiz {
         }, GAME_CONFIG.display.animationDelay);
     }
 
-    startTimer() {
-        if (!this.hasTimeLimit) {
-            return;
-        }
-
-        this.timeLeft = this.timeLeft_initial;
-        this.stopTimer();
-        
-        const timerBar = document.getElementById('timer-bar');
-        timerBar.style.width = '100%';
-        
-        this.timer = setInterval(() => {
-            this.timeLeft = Math.max(0, this.timeLeft - 0.1);
-            
-            const percentageElapsed = ((this.timeLeft_initial - this.timeLeft) / this.timeLeft_initial) * 100;
-            timerBar.style.width = `${100 - percentageElapsed}%`;
-            
-            if (this.timeLeft <= 0) {
-                this.stopTimer();
-                if (this.hasLives) {
-                    this.losePoint();
-                }
-                this.showEndScreen();
-            }
-        }, 100);
-    }
-
-    stopTimer() {
-        if (this.timer) {
-            clearInterval(this.timer);
-            this.timer = null;
-        }
-    }
-
-    losePoint() {
-        if (!this.hasLives) return;
-        
-        if (this.points > 0) {
-            this.points--;
-            this.updatePoints();
-            
-            if (this.points === 0) {
-                this.showEndScreen();
-            }
-        }
-    }
-
-    updatePoints() {
-        const pointsContainer = document.getElementById('points');
-        pointsContainer.innerHTML = ''; // Clear existing points
-        
-        // Only create points if we're using lives
-        if (this.hasLives) {
-            for (let i = 0; i < this.maxLives; i++) {
-                const point = document.createElement('span');
-                point.classList.add('point');
-                if (i < this.points) {
-                    point.classList.add('active');
-                }
-                pointsContainer.appendChild(point);
-            }
-        }
-    }
-
     updateProgress() {
         this.progressElement.textContent = `${this.currentWordIndex}/${this.wordData.length}`;
     }
@@ -400,77 +458,6 @@ class WordSwapQuiz {
             }
         });
     }
-
-    nextWord() {
-        this.currentWordIndex++;
-        this.foundSolutions.clear();
-        this.nextButton.disabled = true;
-        
-        // Clear all solution boxes
-        const solutionBoxes = document.querySelectorAll('.solution-box');
-        solutionBoxes.forEach(box => {
-            box.textContent = '';
-        });
-        
-        if (this.currentWordIndex < this.wordData.length) {
-            this.displayWord();
-        } else {
-            // Game complete - show end screen instead of welcome screen
-            this.showEndScreen();
-        }
-    }
-
-    showEndScreen() {
-        this.gameScreen.classList.add('hidden');
-        this.welcomeScreen.classList.add('hidden');
-        this.endScreen.classList.remove('hidden');
-        this.stopTimer();
-
-        // Update summary information
-        const wordsCompleted = document.getElementById('words-completed');
-        const lastWordSummary = document.getElementById('last-word-summary');
-        const lastWord = document.getElementById('last-word');
-        const lastWordSolutions = document.getElementById('last-word-solutions');
-        const gameOverTitle = document.getElementById('game-over-title');
-        
-        // We've completed the quiz if currentWordIndex equals wordData.length
-        const isCompleted = this.currentWordIndex === this.wordData.length;
-        
-        gameOverTitle.textContent = isCompleted ? 'Quiz Completed!' : 'Game Over';
-        wordsCompleted.textContent = this.currentWordIndex;
-        
-        // Always show last word summary if we have words
-        if (this.wordData.length > 0) {
-            lastWordSummary.classList.remove('hidden');
-            
-            // If completed, show last word (currentWordIndex - 1)
-            // If failed, show current word (currentWordIndex)
-            const lastWordIndex = isCompleted ? this.currentWordIndex - 1 : this.currentWordIndex;
-            const lastWordData = this.wordData[lastWordIndex];
-            lastWord.textContent = lastWordData.word;
-            
-            // Clear and populate solutions
-            lastWordSolutions.innerHTML = '';
-            lastWordData.solutions.forEach(solution => {
-                const solutionSpan = document.createElement('span');
-                solutionSpan.className = 'solution';
-                solutionSpan.textContent = solution;
-                lastWordSolutions.appendChild(solutionSpan);
-            });
-        } else {
-            lastWordSummary.classList.add('hidden');
-        }
-    }
-
-
-    updateTimerVisibility() {
-        // Show/hide timer bar based on timer toggle
-        if (this.timerBarContainer) {
-            this.timerBarContainer.style.display = this.hasTimeLimit ? 'block' : 'none';
-        }
-    }
-
-
 }
 
 // Initialize the game when the page loads
