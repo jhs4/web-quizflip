@@ -1,4 +1,5 @@
 import SeededRandom from './seededRandom.js';
+import { GAME_CONFIG } from './config.js';
 
 class WordSwapQuiz {
     constructor() {
@@ -13,17 +14,17 @@ class WordSwapQuiz {
         
         this.rng = new SeededRandom(this.seed);
         
-        this.maxLives = 5;
+        this.maxLives = GAME_CONFIG.gameplay.maxLives;
         this.points = this.maxLives;
         this.currentWordIndex = 0;
         this.selectedLetters = [];
         this.foundSolutions = new Set();
-        this.timeLeft_initial = 30.0;
+        this.timeLeft_initial = GAME_CONFIG.gameplay.timeLimit;
         this.timeLeft = this.timeLeft_initial;
         this.timer = null;
         this.timerBarContainer = document.querySelector('.timer-bar-container');
         this.wordData = [];
-        this.wordFile = 'wordsforswapping.txt';
+        this.wordFile = GAME_CONFIG.gameplay.wordsFile;
 
         this.initializeElements();
         this.attachEventListeners();
@@ -70,15 +71,15 @@ class WordSwapQuiz {
         if (rawSeed !== null && /^\d+$/.test(rawSeed)) {
             // Convert to number and validate range
             const numSeed = parseInt(rawSeed, 10);
-            if (numSeed >= 0 && numSeed <= 65536) {
+            if (numSeed >= GAME_CONFIG.seed.min && numSeed <= GAME_CONFIG.seed.max) {
                 return [numSeed, true];  // Return valid seed and true flag
             } else {
-                console.warn(`Invalid seed: ${rawSeed} (must be between 0 and 65536). Using random seed instead.`);
+                console.warn(`Invalid seed: ${rawSeed} (must be between ${GAME_CONFIG.seed.min} and ${GAME_CONFIG.seed.max}). Using random seed instead.`);
             }
         } else if (rawSeed !== null) {
             console.warn(`Invalid seed: ${rawSeed} (must contain only digits). Using random seed instead.`);
         }
-        return [Math.floor(Math.random() * 65536), false];  // Return random seed and false flag
+        return [Math.floor(Math.random() * GAME_CONFIG.seed.max), false];  // Return random seed and false flag
     }
 
     displaySeed() {
@@ -135,7 +136,7 @@ class WordSwapQuiz {
         
         // If no manual seed was provided, generate a new random seed
         if (!this.isManualSeed) {
-            this.seed = Math.floor(Math.random() * 65536);
+            this.seed = Math.floor(Math.random() * GAME_CONFIG.seed.max);
             this.rng = new SeededRandom(this.seed);
             // Reshuffle the word list with new seed
             this.wordData = this.rng.shuffle([...this.wordData]);
@@ -207,8 +208,8 @@ class WordSwapQuiz {
         for (let i = 0; i < numSolutions; i++) {
             const solutionBox = document.createElement('div');
             solutionBox.classList.add('solution-box');
-            // Set min-width based on word length
-            solutionBox.style.minWidth = `${currentWordLength * 20}px`; // 20px per character
+            // Use config for letter width
+            solutionBox.style.minWidth = `${currentWordLength * GAME_CONFIG.display.letterWidth}px`;
             solutionsArea.appendChild(solutionBox);
         }
 
@@ -286,13 +287,13 @@ class WordSwapQuiz {
             this.losePoint();
         }
 
-        // Reset after 1 second
+        // Reset after configured delay
         setTimeout(() => {
             this.selectedLetters = [];
             letterElements.forEach(el => {
                 el.classList.remove('selected', 'correct', 'incorrect');
             });
-        }, 1000);
+        }, GAME_CONFIG.display.animationDelay);
     }
 
     startTimer() {
