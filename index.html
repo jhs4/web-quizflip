@@ -30,23 +30,27 @@
         <div id="game-screen" class="hidden">
             <div class="top-bar">
                 <button id="start-over">Start over</button>
-                <div id="points">
-                    <span class="point active"></span>
-                    <span class="point active"></span>
-                    <span class="point active"></span>
-                </div>
+                <div id="points"></div>
                 <button id="next" disabled>Next</button>
             </div>
 
+            <div class="timer-bar-container">
+                <div id="timer-bar"></div>
+            </div>
+
             <div class="game-area">
-                <div id="progress">4/5</div>
-                <div id="current-word"></div>
-                <div id="timer">30.0</div>
+                <div class="word-container">
+                    <div id="current-word"></div>
+                </div>
             </div>
 
             <div class="solutions-area">
                 <div class="solution-box"></div>
                 <div class="solution-box"></div>
+            </div>
+
+            <div class="bottom-bar">
+                <div id="progress">4/5</div>
             </div>
         </div>
 

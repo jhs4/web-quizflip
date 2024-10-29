@@ -6,17 +6,22 @@ class WordSwapQuiz {
         const urlParams = new URLSearchParams(window.location.search);
         const rawSeed = urlParams.get('seed');
         
-        // Validate seed: must be integer between 0 and 65536
-        this.seed = this.validateSeed(rawSeed);
+        // Validate seed and set isManualSeed flag
+        const [validatedSeed, isValid] = this.validateSeed(rawSeed);
+        this.seed = validatedSeed;
+        this.isManualSeed = isValid;  // Only true if seed was valid
+        
         this.rng = new SeededRandom(this.seed);
         
-        this.points = 3;
+        this.maxLives = 5;
+        this.points = this.maxLives;
         this.currentWordIndex = 0;
         this.selectedLetters = [];
         this.foundSolutions = new Set();
-        this.timer = null;
         this.timeLeft_initial = 30.0;
         this.timeLeft = this.timeLeft_initial;
+        this.timer = null;
+        this.timerBarContainer = document.querySelector('.timer-bar-container');
         this.wordData = [];
         this.wordFile = 'wordsforswapping.txt';
 
@@ -66,14 +71,14 @@ class WordSwapQuiz {
             // Convert to number and validate range
             const numSeed = parseInt(rawSeed, 10);
             if (numSeed >= 0 && numSeed <= 65536) {
-                return numSeed;
+                return [numSeed, true];  // Return valid seed and true flag
             } else {
                 console.warn(`Invalid seed: ${rawSeed} (must be between 0 and 65536). Using random seed instead.`);
             }
         } else if (rawSeed !== null) {
             console.warn(`Invalid seed: ${rawSeed} (must contain only digits). Using random seed instead.`);
         }
-        return Math.floor(Math.random() * 65536);
+        return [Math.floor(Math.random() * 65536), false];  // Return random seed and false flag
     }
 
     displaySeed() {
@@ -88,14 +93,11 @@ class WordSwapQuiz {
     async loadWordsFromFile() {
         try {
             const response = await fetch(this.wordFile);
-            if (!response.ok) {
-                throw new Error('Failed to load words file');
-            }
+            if (!response.ok) throw new Error('Failed to load words file');
             
             const text = await response.text();
             const lines = text.trim().split('\n');
             
-            // Create wordData array and shuffle it with seeded random
             this.wordData = this.rng.shuffle(lines.map(line => {
                 const [word, solutions] = line.split(';');
                 return {
@@ -103,15 +105,12 @@ class WordSwapQuiz {
                     solutions: solutions.split(',').map(s => s.trim())
                 };
             }));
-
         } catch (error) {
             console.error('Error loading words:', error);
-            this.wordData = [
-                {
-                    word: "LATENT",
-                    solutions: ["TALENT"]
-                }
-            ];
+            this.wordData = [{
+                word: "LATENT",
+                solutions: ["TALENT"]
+            }];
         }
     }
 
@@ -119,7 +118,6 @@ class WordSwapQuiz {
         this.welcomeScreen = document.getElementById('welcome-screen');
         this.gameScreen = document.getElementById('game-screen');
         this.currentWordElement = document.getElementById('current-word');
-        this.timerElement = document.getElementById('timer');
         this.progressElement = document.getElementById('progress');
         this.nextButton = document.getElementById('next');
     }
@@ -132,8 +130,19 @@ class WordSwapQuiz {
 
     showWelcomeScreen() {
         this.gameScreen.classList.add('hidden');
-        this.endScreen.classList.add('hidden');  // Hide end screen
+        this.endScreen.classList.add('hidden');
         this.welcomeScreen.classList.remove('hidden');
+        
+        // If no manual seed was provided, generate a new random seed
+        if (!this.isManualSeed) {
+            this.seed = Math.floor(Math.random() * 65536);
+            this.rng = new SeededRandom(this.seed);
+            // Reshuffle the word list with new seed
+            this.wordData = this.rng.shuffle([...this.wordData]);
+            // Update seed display
+            this.displaySeed();
+        }
+        
         this.resetGame();
     }
 
@@ -147,10 +156,11 @@ class WordSwapQuiz {
         this.gameScreen.classList.remove('hidden');
         this.resetGame();
         this.displayWord();
+        this.updateTimerVisibility();
     }
 
     resetGame() {
-        this.points = this.hasLives ? 3 : Infinity;
+        this.points = this.hasLives ? this.maxLives : Infinity;
         this.currentWordIndex = 0;
         this.selectedLetters = [];
         this.foundSolutions = new Set();
@@ -191,11 +201,14 @@ class WordSwapQuiz {
         const solutionsArea = document.querySelector('.solutions-area');
         solutionsArea.innerHTML = '';  // Clear existing boxes
         const numSolutions = this.wordData[this.currentWordIndex].solutions.length;
+        const currentWordLength = this.wordData[this.currentWordIndex].word.length;
         
         // Create empty solution boxes
         for (let i = 0; i < numSolutions; i++) {
             const solutionBox = document.createElement('div');
             solutionBox.classList.add('solution-box');
+            // Set min-width based on word length
+            solutionBox.style.minWidth = `${currentWordLength * 20}px`; // 20px per character
             solutionsArea.appendChild(solutionBox);
         }
 
@@ -284,16 +297,20 @@ class WordSwapQuiz {
 
     startTimer() {
         if (!this.hasTimeLimit) {
-            this.timerElement.textContent = '∞';
             return;
         }
 
         this.timeLeft = this.timeLeft_initial;
         this.stopTimer();
         
+        const timerBar = document.getElementById('timer-bar');
+        timerBar.style.width = '100%';
+        
         this.timer = setInterval(() => {
             this.timeLeft = Math.max(0, this.timeLeft - 0.1);
-            this.timerElement.textContent = this.timeLeft.toFixed(1);
+            
+            const percentageElapsed = ((this.timeLeft_initial - this.timeLeft) / this.timeLeft_initial) * 100;
+            timerBar.style.width = `${100 - percentageElapsed}%`;
             
             if (this.timeLeft <= 0) {
                 this.stopTimer();
@@ -326,15 +343,24 @@ class WordSwapQuiz {
     }
 
     updatePoints() {
-        const pointElements = document.querySelectorAll('.point');
-        pointElements.forEach((el, index) => {
-            el.classList.toggle('active', index < this.points);
-        });
+        const pointsContainer = document.getElementById('points');
+        pointsContainer.innerHTML = ''; // Clear existing points
+        
+        // Only create points if we're using lives
+        if (this.hasLives) {
+            for (let i = 0; i < this.maxLives; i++) {
+                const point = document.createElement('span');
+                point.classList.add('point');
+                if (i < this.points) {
+                    point.classList.add('active');
+                }
+                pointsContainer.appendChild(point);
+            }
+        }
     }
 
     updateProgress() {
-        this.progressElement.textContent = 
-            `${this.currentWordIndex}/${this.wordData.length}`;
+        this.progressElement.textContent = `${this.currentWordIndex}/${this.wordData.length}`;
     }
 
     updateSolutionsDisplay() {
@@ -401,6 +427,17 @@ class WordSwapQuiz {
             });
         }
     }
+
+
+
+    updateTimerVisibility() {
+        // Show/hide timer bar based on timer toggle
+        if (this.timerBarContainer) {
+            this.timerBarContainer.style.display = this.hasTimeLimit ? 'block' : 'none';
+        }
+    }
+
+
 }
 
 // Initialize the game when the page loads
