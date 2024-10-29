@@ -64,6 +64,20 @@ class WordSwapQuiz {
                 pointsDisplay.style.visibility = e.target.checked ? 'visible' : 'hidden';
             }
         });
+
+        // Get lives selector elements
+        this.livesSelect = document.getElementById('lives-count');
+        this.livesToggle = document.getElementById('lives-toggle');
+        
+        // Add toggle listener to enable/disable lives selector
+        this.livesToggle.addEventListener('change', (e) => {
+            this.hasLives = e.target.checked;
+            this.livesSelect.disabled = !e.target.checked;
+            const pointsDisplay = document.getElementById('points');
+            if (pointsDisplay) {
+                pointsDisplay.style.visibility = e.target.checked ? 'visible' : 'hidden';
+            }
+        });
     }
 
     validateSeed(rawSeed) {
@@ -161,6 +175,8 @@ class WordSwapQuiz {
     }
 
     resetGame() {
+        // Update maxLives based on selector
+        this.maxLives = this.hasLives ? parseInt(this.livesSelect.value) : GAME_CONFIG.gameplay.maxLives;
         this.points = this.hasLives ? this.maxLives : Infinity;
         this.currentWordIndex = 0;
         this.selectedLetters = [];
@@ -277,10 +293,16 @@ class WordSwapQuiz {
             this.foundSolutions.add(swappedWord);
             this.updateSolutionsDisplay();
             
-            // If all solutions found, enable next button and stop timer
+            // If all solutions found for current word
             if (this.foundSolutions.size === this.wordData[this.currentWordIndex].solutions.length) {
                 this.nextButton.disabled = false;
                 this.stopTimer();
+                
+                // If this was the last word, show end screen immediately
+                if (this.currentWordIndex === this.wordData.length - 1) {
+                    this.currentWordIndex++;
+                    this.showEndScreen();
+                }
             }
         } else {
             // Wrong swap, lose a point
@@ -393,9 +415,8 @@ class WordSwapQuiz {
         if (this.currentWordIndex < this.wordData.length) {
             this.displayWord();
         } else {
-            // Game complete
-            alert('Quiz completed!');
-            this.showWelcomeScreen();
+            // Game complete - show end screen instead of welcome screen
+            this.showEndScreen();
         }
     }
 
@@ -407,28 +428,39 @@ class WordSwapQuiz {
 
         // Update summary information
         const wordsCompleted = document.getElementById('words-completed');
+        const lastWordSummary = document.getElementById('last-word-summary');
         const lastWord = document.getElementById('last-word');
         const lastWordSolutions = document.getElementById('last-word-solutions');
+        const gameOverTitle = document.getElementById('game-over-title');
         
-        // Show number of completed words
+        // We've completed the quiz if currentWordIndex equals wordData.length
+        const isCompleted = this.currentWordIndex === this.wordData.length;
+        
+        gameOverTitle.textContent = isCompleted ? 'Quiz Completed!' : 'Game Over';
         wordsCompleted.textContent = this.currentWordIndex;
         
-        // Show last word and its solutions
+        // Always show last word summary if we have words
         if (this.wordData.length > 0) {
-            const currentWordData = this.wordData[this.currentWordIndex];
-            lastWord.textContent = currentWordData.word;
+            lastWordSummary.classList.remove('hidden');
+            
+            // If completed, show last word (currentWordIndex - 1)
+            // If failed, show current word (currentWordIndex)
+            const lastWordIndex = isCompleted ? this.currentWordIndex - 1 : this.currentWordIndex;
+            const lastWordData = this.wordData[lastWordIndex];
+            lastWord.textContent = lastWordData.word;
             
             // Clear and populate solutions
             lastWordSolutions.innerHTML = '';
-            currentWordData.solutions.forEach(solution => {
+            lastWordData.solutions.forEach(solution => {
                 const solutionSpan = document.createElement('span');
                 solutionSpan.className = 'solution';
                 solutionSpan.textContent = solution;
                 lastWordSolutions.appendChild(solutionSpan);
             });
+        } else {
+            lastWordSummary.classList.add('hidden');
         }
     }
-
 
 
     updateTimerVisibility() {

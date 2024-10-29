@@ -21,6 +21,18 @@
                     <span class="toggle-label">Lives</span>
                 </label>
             </div>
+            <div class="lives-selector">
+                <label for="lives-count">Number of Lives:</label>
+                <select id="lives-count" disabled>
+                    <option value="1">1</option>
+                    <option value="3">3</option>
+                    <option value="5">5</option>
+                    <option value="7">7</option>
+                    <option value="9">9</option>
+                </select>
+            </div>
+            <p></p>
+            <p></p>
             <button id="start-game">Start Quiz</button>
             <p></p>
             <div id="seed-display"></div>
@@ -50,12 +62,12 @@
             </div>
 
             <div class="bottom-bar">
-                <div id="progress">4/5</div>
+                <div id="progress"></div>
             </div>
         </div>
 
         <div id="end-screen" class="hidden">
-            <h2>Game Over</h2>
+            <h2 id="game-over-title">Game Over</h2>
             <div id="game-summary">
                 <p>Words completed: <span id="words-completed">0</span></p>
                 <div id="last-word-summary">
